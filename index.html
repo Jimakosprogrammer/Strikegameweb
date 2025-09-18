@@ -339,11 +339,24 @@ if(!state.ownedSkins.includes('red')) state.ownedSkins.push('red');
 
 function persistStateToStorage(){
   if(currentUser){
-    // write back into accounts object
+    // Preserve any fields that existed in the stored account (including password)
+    const existing = accounts[currentUser] || {};
     accounts[currentUser] = {
-      coins: state.coins, highest: state.highest, ownedSkins: state.ownedSkins, selectedSkin: state.selectedSkin,
-      difficulty: state.difficulty, soundOn: state.soundOn, lives: state.lives, totalScore: state.totalScore,
-      vipExpiry: state.vipExpiry, achievements: state.achievements, stats: state.stats, dailyChallenges: state.dailyChallenges
+      // keep existing fields not stored in 'state' (password, createdAt, etc)
+      ...existing,
+      // now update the fields we manage in state
+      coins: state.coins,
+      highest: state.highest,
+      ownedSkins: state.ownedSkins,
+      selectedSkin: state.selectedSkin,
+      difficulty: state.difficulty,
+      soundOn: state.soundOn,
+      lives: state.lives,
+      totalScore: state.totalScore,
+      vipExpiry: state.vipExpiry,
+      achievements: state.achievements,
+      stats: state.stats,
+      dailyChallenges: state.dailyChallenges
     };
     saveAccounts(accounts);
     localStorage.setItem(LS.currentUser, currentUser);
@@ -362,6 +375,7 @@ function persistStateToStorage(){
     localStorage.setItem(LS.dailyChallenges, JSON.stringify(state.dailyChallenges));
   }
 }
+
 
 function saveState(){ persistStateToStorage(); }
 
@@ -682,9 +696,17 @@ document.getElementById('loginAcct').addEventListener('click', ()=>{
   const pass = (document.getElementById('acctPass').value||'').trim();
   if(!name || !pass){ showToast('Enter username and password'); return; }
   if(!accounts[name]){ showToast('No such account'); return; }
-  if(accounts[name].password !== pass){ showToast('Wrong password'); return; }
-  currentUser = name; localStorage.setItem(LS.currentUser, currentUser); state = loadStateForUser(); saveState(); updateDisplays(); renderSkins(); showToast('Logged in: '+name);
+  const stored = accounts[name].password || '';
+  if(String(stored) !== String(pass)){ showToast('Wrong password'); return; }
+  currentUser = name;
+  localStorage.setItem(LS.currentUser, currentUser);
+  state = loadStateForUser();
+  saveState();
+  updateDisplays();
+  renderSkins();
+  showToast('Logged in: ' + name);
 });
+
 
 document.getElementById('exportAcct').addEventListener('click', ()=>{
   if(!currentUser){ showToast('Login first to export your account'); return; }
@@ -697,8 +719,38 @@ document.getElementById('exportAcct').addEventListener('click', ()=>{
 document.getElementById('importAcct').addEventListener('click', ()=>{
   const txt = prompt('Paste account JSON here (or use exported file content)');
   if(!txt) return;
-  try{ const obj = JSON.parse(txt); if(!obj || !obj || !obj || !obj) { showToast('Invalid JSON'); return; } const name = prompt('Pick a username to import under:'); if(!name) return; accounts[name] = obj; saveAccounts(accounts); showToast('Account imported as '+name); }catch(e){ showToast('Import failed'); }
+  try{
+    const obj = JSON.parse(txt);
+    let name = prompt('Pick a username to import under:');
+    if(!name) { showToast('Import cancelled'); return; }
+
+    // If imported data doesn't include a password, ask the user to set one.
+    if(!obj.password){
+      const p = prompt('Imported account has no password. Set a password for this account:');
+      if(!p){ showToast('Import cancelled'); return; }
+      obj.password = p;
+    }
+
+    // Overwrite confirmation if account exists
+    if(accounts[name] && !confirm('Account already exists locally. Overwrite?')) return;
+
+    accounts[name] = obj;
+    saveAccounts(accounts);
+
+    // Auto-login the imported account
+    currentUser = name;
+    localStorage.setItem(LS.currentUser, currentUser);
+    state = loadStateForUser();
+    saveState(); // persists and updates displays
+    updateDisplays();
+    renderSkins();
+    showToast('Account imported & logged in as ' + name);
+  } catch(e){
+    console.error(e);
+    showToast('Import failed: invalid JSON');
+  }
 });
+
 
 /* ------------------- Leaderboard UI ------------------- */
 document.getElementById('leaderBtn').addEventListener('click', ()=>{ openMenu('menuLeader'); renderLeaderboard(); });
@@ -717,3 +769,4 @@ document.getElementById('overlay').addEventListener('click',(e)=>{ if(e.target.i
 </script>
 </body>
 </html>
+
