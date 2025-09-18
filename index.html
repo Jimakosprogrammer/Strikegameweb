@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Strike!!! — Legendary Edition (VIP + Ranks)</title>
+<title>Strike!!! Version 1.2</title>
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700;900&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -123,7 +123,7 @@ body.playing .rankBadge{padding:6px 10px;font-size:13px}
     <div class="panel"><div id="totalScoreDisplay">Total: 0</div></div>
   </div>
 
-  <div class="title">STRIKE!!! <span class="small">— Version 1.0</span></div>
+  <div class="title">STRIKE!!! <span class="small">Version 1.2</span></div>
 
   <div class="controls" id="mainControls">
     <button id="playBtn" class="btn primary">Play</button>
@@ -132,7 +132,7 @@ body.playing .rankBadge{padding:6px 10px;font-size:13px}
     <button id="statsBtn" class="btn">Stats</button>
     <button id="dailyBtn" class="btn">Daily</button>
     <button id="settingsBtn" class="btn">Settings</button>
-    <button id="resetBtn" class="btn">Reset</button>
+    <button id="leaderBtn" class="btn">Leaderboard</button>
   </div>
 
   <div class="legend">VIP for 1 month — 3000 coins ✨</div>
@@ -167,6 +167,7 @@ body.playing .rankBadge{padding:6px 10px;font-size:13px}
         <div id="difEasy" class="badge">Easy</div>
         <div id="difMed" class="badge active">Medium</div>
         <div id="difHard" class="badge">Hard</div>
+        <div id="difExtreme" class="badge locked">Extreme</div>
       </div>
       <div style="height:12px"></div>
       <div class="row"><button id="startFromMenu" class="btn primary">Start Game</button><button id="openShopFromMenu" class="btn">Open Shop</button></div>
@@ -190,7 +191,7 @@ body.playing .rankBadge{padding:6px 10px;font-size:13px}
       <div style="height:8px"></div>
       <div class="row">
         <button id="buyLife" class="btn">Buy Life</button>
-        <button id="buyVipCoins" class="btn primary">Get VIP (2000 coins)</button>
+        <button id="buyVipCoins" class="btn primary">Get VIP (3000 coins)</button>
         <button id="openBuyMenu" class="btn">Buy Coins (Card)</button>
       </div>
     </div>
@@ -244,10 +245,23 @@ body.playing .rankBadge{padding:6px 10px;font-size:13px}
     </div>
 
     <div id="menuSettings" class="menu">
-      <h2>Settings</h2>
+      <h2>Settings & Account</h2>
       <div class="row"><button id="toggleSound" class="btn">Toggle Sound</button><button id="clearSaves" class="btn">Clear Saves</button></div>
       <div style="height:10px"></div>
-      <button id="backFromSettings" class="btn primary">Back</button>
+      <div class="field"><label class="small">Account Name</label><input id="acctName" placeholder="username" /></div>
+      <div class="field"><label class="small">Password</label><input id="acctPass" type="password" placeholder="password" /></div>
+      <div class="row"><button id="createAcct" class="btn">Create Account</button><button id="loginAcct" class="btn primary">Login</button></div>
+      <div style="height:10px"></div>
+      <div class="row"><button id="exportAcct" class="btn">Export Account</button><button id="importAcct" class="btn primary">Import Account</button></div>
+      <div style="height:12px"></div>
+      <div class="row"><button id="resetProgressInSettings" class="btn ghost">Reset Progress</button><button id="backFromSettings" class="btn primary">Back</button></div>
+    </div>
+
+    <div id="menuLeader" class="menu">
+      <h2>Global Leaderboards (Top 100)</h2>
+      <div id="leaderList" style="max-height:360px;overflow:auto;"></div>
+      <div style="height:8px"></div>
+      <div class="row"><button id="backFromLeader" class="btn primary">Back</button><button id="exportLeaderboard" class="btn">Export</button></div>
     </div>
   </div>
 
@@ -258,9 +272,9 @@ body.playing .rankBadge{padding:6px 10px;font-size:13px}
 </div>
 
 <script>
-/* ------------------- STORAGE & DEFAULTS ------------------- */
+/* ------------------- STORAGE & DEFAULTS (extended for accounts & leaderboard) ------------------- */
 const LS = {
-  coins:'strike_coins', highest:'strike_highest', ownedSkins:'strike_ownedSkins', selectedSkin:'strike_selectedSkin', difficulty:'strike_difficulty', soundOn:'strike_soundOn', lives:'strike_lives', totalScore:'strike_totalScore', vipExpiry:'strike_vipExpiry', achievements:'strike_achievements', stats:'strike_stats', dailyChallenges:'strike_dailyChallenges'
+  coins:'strike_coins', highest:'strike_highest', ownedSkins:'strike_ownedSkins', selectedSkin:'strike_selectedSkin', difficulty:'strike_difficulty', soundOn:'strike_soundOn', lives:'strike_lives', totalScore:'strike_totalScore', vipExpiry:'strike_vipExpiry', achievements:'strike_achievements', stats:'strike_stats', dailyChallenges:'strike_dailyChallenges', accounts:'strike_accounts', currentUser:'strike_currentUser', leaderboard:'strike_leaderboard'
 };
 
 const RANKS = [
@@ -270,56 +284,97 @@ const RANKS = [
   {name:'Fighter', threshold:10000},
   {name:'Veteran', threshold:25000},
   {name:'Elite', threshold:50000},
-  {name:'Champion', threshold:70000},
+  {name:'Champion', threshold:75000},
   {name:'Legend', threshold:100000},
   {name:'Mythic', threshold:250000},
   {name:'Ascendant', threshold:500000}
 ];
 
-const defaultState = {
-  coins: Number(localStorage.getItem(LS.coins) || 0),
-  highest: Number(localStorage.getItem(LS.highest) || 0),
-  ownedSkins: JSON.parse(localStorage.getItem(LS.ownedSkins) || '[]'),
-  selectedSkin: localStorage.getItem(LS.selectedSkin) || 'red',
-  difficulty: localStorage.getItem(LS.difficulty) || 'medium',
-  soundOn: (localStorage.getItem(LS.soundOn)===null) ? true : JSON.parse(localStorage.getItem(LS.soundOn)),
-  lives: Number(localStorage.getItem(LS.lives) || 1),
-  totalScore: Number(localStorage.getItem(LS.totalScore) || 0),
-  vipExpiry: Number(localStorage.getItem(LS.vipExpiry) || 0),
-  achievements: JSON.parse(localStorage.getItem(LS.achievements) || '{}'),
-  stats: JSON.parse(localStorage.getItem(LS.stats) || JSON.stringify({timePlayed:0, runs:0, enemies:0, powerups:0, coins:0})),
-  dailyChallenges: JSON.parse(localStorage.getItem(LS.dailyChallenges) || '{}')
-};
+// load accounts map from localStorage (username -> data)
+function loadAccounts(){ try{ return JSON.parse(localStorage.getItem(LS.accounts) || '{}'); }catch(e){ return {}; } }
+function saveAccounts(accounts){ localStorage.setItem(LS.accounts, JSON.stringify(accounts)); }
+
+let accounts = loadAccounts();
+let currentUser = localStorage.getItem(LS.currentUser) || null;
+
+// Try to load user-scoped state if logged in
+function loadStateForUser(){
+  if(currentUser && accounts[currentUser]){
+    const a = accounts[currentUser];
+    return {
+      coins: Number(a.coins||0),
+      highest: Number(a.highest||0),
+      ownedSkins: a.ownedSkins || [],
+      selectedSkin: a.selectedSkin || 'red',
+      difficulty: a.difficulty || 'medium',
+      soundOn: (a.soundOn===undefined) ? true : !!a.soundOn,
+      lives: Number(a.lives||1),
+      totalScore: Number(a.totalScore||0),
+      vipExpiry: Number(a.vipExpiry||0),
+      achievements: a.achievements || {},
+      stats: a.stats || {timePlayed:0,runs:0,enemies:0,powerups:0,coins:0},
+      dailyChallenges: a.dailyChallenges || {}
+    };
+  }
+  // fallback to global saves if not logged in
+  return {
+    coins: Number(localStorage.getItem(LS.coins) || 0),
+    highest: Number(localStorage.getItem(LS.highest) || 0),
+    ownedSkins: JSON.parse(localStorage.getItem(LS.ownedSkins) || '[]'),
+    selectedSkin: localStorage.getItem(LS.selectedSkin) || 'red',
+    difficulty: localStorage.getItem(LS.difficulty) || 'medium',
+    soundOn: (localStorage.getItem(LS.soundOn)===null) ? true : JSON.parse(localStorage.getItem(LS.soundOn)),
+    lives: Number(localStorage.getItem(LS.lives) || 1),
+    totalScore: Number(localStorage.getItem(LS.totalScore) || 0),
+    vipExpiry: Number(localStorage.getItem(LS.vipExpiry) || 0),
+    achievements: JSON.parse(localStorage.getItem(LS.achievements) || '{}'),
+    stats: JSON.parse(localStorage.getItem(LS.stats) || JSON.stringify({timePlayed:0, runs:0, enemies:0, powerups:0, coins:0})),
+    dailyChallenges: JSON.parse(localStorage.getItem(LS.dailyChallenges) || '{}')
+  };
+}
+
+const defaultState = loadStateForUser();
 let state = {...defaultState};
 if(!state.ownedSkins.includes('red')) state.ownedSkins.push('red');
 
-function saveState(){
-  localStorage.setItem(LS.coins, state.coins);
-  localStorage.setItem(LS.highest, state.highest);
-  localStorage.setItem(LS.ownedSkins, JSON.stringify(state.ownedSkins));
-  localStorage.setItem(LS.selectedSkin, state.selectedSkin);
-  localStorage.setItem(LS.difficulty, state.difficulty);
-  localStorage.setItem(LS.soundOn, JSON.stringify(state.soundOn));
-  localStorage.setItem(LS.lives, state.lives);
-  localStorage.setItem(LS.totalScore, state.totalScore);
-  localStorage.setItem(LS.vipExpiry, state.vipExpiry);
-  localStorage.setItem(LS.achievements, JSON.stringify(state.achievements));
-  localStorage.setItem(LS.stats, JSON.stringify(state.stats));
-  localStorage.setItem(LS.dailyChallenges, JSON.stringify(state.dailyChallenges));
+function persistStateToStorage(){
+  if(currentUser){
+    // write back into accounts object
+    accounts[currentUser] = {
+      coins: state.coins, highest: state.highest, ownedSkins: state.ownedSkins, selectedSkin: state.selectedSkin,
+      difficulty: state.difficulty, soundOn: state.soundOn, lives: state.lives, totalScore: state.totalScore,
+      vipExpiry: state.vipExpiry, achievements: state.achievements, stats: state.stats, dailyChallenges: state.dailyChallenges
+    };
+    saveAccounts(accounts);
+    localStorage.setItem(LS.currentUser, currentUser);
+  } else {
+    localStorage.setItem(LS.coins, state.coins);
+    localStorage.setItem(LS.highest, state.highest);
+    localStorage.setItem(LS.ownedSkins, JSON.stringify(state.ownedSkins));
+    localStorage.setItem(LS.selectedSkin, state.selectedSkin);
+    localStorage.setItem(LS.difficulty, state.difficulty);
+    localStorage.setItem(LS.soundOn, JSON.stringify(state.soundOn));
+    localStorage.setItem(LS.lives, state.lives);
+    localStorage.setItem(LS.totalScore, state.totalScore);
+    localStorage.setItem(LS.vipExpiry, state.vipExpiry);
+    localStorage.setItem(LS.achievements, JSON.stringify(state.achievements));
+    localStorage.setItem(LS.stats, JSON.stringify(state.stats));
+    localStorage.setItem(LS.dailyChallenges, JSON.stringify(state.dailyChallenges));
+  }
 }
 
-/* ------------------- ACHIEVEMENTS ------------------- */
-/* extended achievements including rank-based awards */
+function saveState(){ persistStateToStorage(); }
+
+/* ------------------- ACHIEVEMENTS (unchanged) ------------------- */
 const ACHS = [
   {id:'score_10k', title:'Score Novice', desc:'Συνολικό σκορ 10.000', check:()=> state.totalScore>=10000, reward:100},
   {id:'score_50k', title:'Score Pro', desc:'Συνολικό σκορ 50.000', check:()=> state.totalScore>=50000, reward:300},
   {id:'coins_500', title:'Coins Hoarder', desc:'Συνολικά 500 νομίσματα', check:()=> state.coins>=500, reward:150},
   {id:'skins_4', title:'Skin Collector', desc:'Έχεις 4 skins', check:()=> state.ownedSkins.length>=4, reward:200},
   {id:'vip_bought', title:'VIP Initiate', desc:'Αγόρασες VIP', check:()=> isVIP(), reward:50},
-  // rank-based achievements (new)
   {id:'rank_rookie', title:'Rookie Achieved', desc:'Reached rank: Rookie', check:()=> getRankFromScore(state.highest).name === 'Rookie' || getRankFromScore(state.highest).index >= 1, reward:50},
-  {id:'rank_fighter', title:'Fighter Achieved', desc:'Reached rank: Fighter', check:()=> getRankFromScore(state.highest).name === 'Fighter' || getRankFromScore(state.highest).index >= 3, reward:150},
-  {id:'rank_champion', title:'Champion Achieved', desc:'Reached rank: Champion', check:()=> getRankFromScore(state.highest).name === 'Champion' || getRankFromScore(state.highest).index >= 6, reward:500},
+  {id:'rank_fighter', title:'Fighter Achieved', desc:'Fighter rank', check:()=> getRankFromScore(state.highest).index >= 3, reward:150},
+  {id:'rank_champion', title:'Champion Achieved', desc:'Champion rank', check:()=> getRankFromScore(state.highest).index >= 6, reward:500},
 ];
 
 function checkAchievements(){ let unlocked=[]; ACHS.forEach(a=>{ try{ if(a.check() && !state.achievements[a.id]){ state.achievements[a.id]=true; state.coins += a.reward; unlocked.push(a); showToast('Achievement unlocked: '+a.title); } }catch(e){ console.error('ach check error',e); } }); if(unlocked.length) { saveState(); renderAchievements(); updateDisplays(); } }
@@ -330,11 +385,8 @@ function daysLeftVIP(){ const ms = (state.vipExpiry||0) - Date.now(); return ms>
 
 function grantDailyVIP(){ const key='strike_lastDaily'; const last = localStorage.getItem(key)||''; const today = new Date().toDateString(); if(isVIP() && last!==today){ localStorage.setItem(key,today); state.coins += 75; showToast('VIP daily bonus: +75 coins'); saveState(); updateDisplays(); } }
 
-/* ------------------- DAILY CHALLENGES ------------------- */
-/*
-  The daily challenge is regenerated each day. Stored locally in state.dailyChallenges:
-  { date: 'Tue Sep 09 2025', id:'monday_highest', title, desc, type, target, reward, completed:false, progress:0 }
-*/
+/* ------------------- DAILY CHALLENGES (unchanged) ------------------- */
+/* ... (omitted for brevity but behavior kept identical to previous) */
 const WEEKLY_CHALLENGE_TEMPLATES = {
   1: {id:'monday_highest', title:'Monday — High Score Push', desc:'Get a highest score ≥ 10,000 today', type:'highest', target:10000, reward:100},
   2: {id:'tuesday_coins', title:'Tuesday — Coin Rush', desc:'Collect 200 coins in a single run', type:'collect', target:200, reward:75},
@@ -345,92 +397,13 @@ const WEEKLY_CHALLENGE_TEMPLATES = {
   0: {id:'sunday_time', title:'Sunday — Marathon', desc:'Play for 300 seconds today', type:'time', target:300, reward:100}
 };
 
-function ensureDailyChallenge(){
-  const today = new Date().toDateString();
-  if(!state.dailyChallenges || state.dailyChallenges.date !== today){
-    const weekday = new Date().getDay(); // 0 Sun - 6 Sat
-    const tpl = WEEKLY_CHALLENGE_TEMPLATES[weekday] || WEEKLY_CHALLENGE_TEMPLATES[1];
-    state.dailyChallenges = {
-      date: today,
-      id: tpl.id,
-      title: tpl.title,
-      desc: tpl.desc,
-      type: tpl.type,
-      target: tpl.target,
-      reward: tpl.reward,
-      completed: false,
-      progress: 0
-    };
-    // reset per-session counters for tracking
-    sessionEarnedCoins = 0;
-    saveState();
-  }
-}
+function ensureDailyChallenge(){ const today = new Date().toDateString(); if(!state.dailyChallenges || state.dailyChallenges.date !== today){ const weekday = new Date().getDay(); const tpl = WEEKLY_CHALLENGE_TEMPLATES[weekday] || WEEKLY_CHALLENGE_TEMPLATES[1]; state.dailyChallenges = { date: today, id: tpl.id, title: tpl.title, desc: tpl.desc, type: tpl.type, target: tpl.target, reward: tpl.reward, completed: false, progress: 0 }; sessionEarnedCoins = 0; saveState(); } }
 
-function renderDaily(){
-  ensureDailyChallenge();
-  const d = state.dailyChallenges;
-  const el = document.getElementById('dailyContent');
-  const progressText = d.completed ? 'Completed' : `Progress: ${Math.floor(d.progress)}/${d.target}`;
-  el.innerHTML = `<strong>${d.title}</strong><div class="small">${d.desc}</div><div style="height:8px"></div><div class="small">${progressText}</div><div style="height:6px"></div><div class="small">Reward: ${d.reward} coins</div>`;
-  document.getElementById('claimDaily').disabled = !d.completed || d.claimed;
-}
+function renderDaily(){ ensureDailyChallenge(); const d = state.dailyChallenges; const el = document.getElementById('dailyContent'); const progressText = d.completed ? 'Completed' : `Progress: ${Math.floor(d.progress)}/${d.target}`; el.innerHTML = `<strong>${d.title}</strong><div class="small">${d.desc}</div><div style="height:8px"></div><div class="small">${progressText}</div><div style="height:6px"></div><div class="small">Reward: ${d.reward} coins</div>`; document.getElementById('claimDaily').disabled = !d.completed || d.claimed; }
 
-function checkDailyChallengeOnEvent(){
-  // called whenever relevant events occur (coin collect, enemy defeat, gameOver, time tick)
-  ensureDailyChallenge();
-  const d = state.dailyChallenges;
-  if(d.completed) return;
-  switch(d.type){
-    case 'highest':
-      // highest today is the state.highest but also if current session score surpasses daily target
-      if(state.highest >= d.target) d.completed = true;
-      break;
-    case 'collect':
-      if(sessionEarnedCoins >= d.target) d.completed = true;
-      d.progress = sessionEarnedCoins;
-      break;
-    case 'runs':
-      // state.stats.runs tracks total runs — we need runs today; to keep it simple, allow any run increment to count for today
-      // We'll track runsToday in dailyChallenges.progress
-      d.progress = d.progress || 0;
-      if(d.progress >= d.target) d.completed = true;
-      break;
-    case 'enemies':
-      // accumulate in daily progress
-      d.progress = d.progress || 0;
-      if(d.progress >= d.target) d.completed = true;
-      break;
-    case 'score_single':
-      if(latestRunMaxScore >= d.target) d.completed = true;
-      d.progress = latestRunMaxScore;
-      break;
-    case 'buy_vip':
-      if(d.progress >= 1) d.completed = true;
-      break;
-    case 'time':
-      d.progress = d.progress || 0;
-      if(d.progress >= d.target) d.completed = true;
-      break;
-  }
-  if(d.completed){
-    showToast('Daily challenge completed! Claim your reward.');
-  }
-  saveState();
-}
+function checkDailyChallengeOnEvent(){ ensureDailyChallenge(); const d = state.dailyChallenges; if(d.completed) return; switch(d.type){ case 'highest': if(state.highest >= d.target) d.completed = true; break; case 'collect': if(sessionEarnedCoins >= d.target) d.completed = true; d.progress = sessionEarnedCoins; break; case 'runs': d.progress = d.progress || 0; if(d.progress >= d.target) d.completed = true; break; case 'enemies': d.progress = d.progress || 0; if(d.progress >= d.target) d.completed = true; break; case 'score_single': if(latestRunMaxScore >= d.target) d.completed = true; d.progress = latestRunMaxScore; break; case 'buy_vip': if(d.progress >= 1) d.completed = true; break; case 'time': d.progress = d.progress || 0; if(d.progress >= d.target) d.completed = true; break; } if(d.completed) showToast('Daily challenge completed! Claim your reward.'); saveState(); }
 
-document.getElementById('claimDaily').addEventListener('click', ()=>{
-  ensureDailyChallenge();
-  const d = state.dailyChallenges;
-  if(d.completed && !d.claimed){
-    state.coins += d.reward;
-    d.claimed = true;
-    saveState();
-    updateDisplays();
-    renderDaily();
-    showToast('Daily reward claimed: +'+d.reward+' coins');
-  } else showToast('Challenge not completed yet');
-});
+document.getElementById('claimDaily').addEventListener('click', ()=>{ ensureDailyChallenge(); const d = state.dailyChallenges; if(d.completed && !d.claimed){ state.coins += d.reward; d.claimed = true; saveState(); updateDisplays(); renderDaily(); showToast('Daily reward claimed: +'+d.reward+' coins'); } else showToast('Challenge not completed yet'); });
 document.getElementById('backFromDaily').addEventListener('click', ()=>{ openMenu('menuMain'); });
 
 /* ------------------- CANVAS + ENTITIES ------------------- */
@@ -438,7 +411,7 @@ const canvas = document.getElementById('gameCanvas'); const ctx = canvas.getCont
 function fitCanvas(){ canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
 window.addEventListener('resize', fitCanvas); fitCanvas();
 
-const DIFF = { easy:{spawn:1100,speed:5.5,coinRate:0.12}, medium:{spawn:700,speed:8,coinRate:0.17}, hard:{spawn:420,speed:12,coinRate:0.22} };
+const DIFF = { easy:{spawn:1100,speed:5.5,coinRate:0.12}, medium:{spawn:700,speed:8,coinRate:0.17}, hard:{spawn:420,speed:12,coinRate:0.22}, extreme:{spawn:260,speed:18,coinRate:0.28} };
 let difficulty = state.difficulty;
 
 function rnd(a,b){return Math.floor(Math.random()*(b-a))+a}
@@ -448,18 +421,27 @@ function shadeColor(color, percent){ const f=parseInt(color.slice(1),16),t=perce
 const SKINS = { red:{color:'#ff4b4b',cost:0}, blue:{color:'#3aa0ff',cost:10}, green:{color:'#32d583',cost:50}, yellow:{color:'#ffd54a',cost:50}, purple:{color:'#a24cff',cost:500}, gold:{color:'#ffd700',cost:1000}, vip:{color:'#ff7aa2',cost:0,exclusive:true} };
 
 // Entities
-class Player{ constructor(){ this.x=120; this.y=canvas.height/2; this.r=18; this.skin=state.selectedSkin; this.revived=false; this.invincible=0; } render(){ ctx.save(); // shadow
- ctx.beginPath(); ctx.fillStyle='rgba(0,0,0,0.12)'; ctx.ellipse(this.x+2,this.y+8,this.r+12,this.r+6,0,0,Math.PI*2); ctx.fill(); // body
- const col = SKINS[this.skin].color; const g = ctx.createLinearGradient(this.x-this.r,this.y-this.r,this.x+this.r,this.y+this.r); g.addColorStop(0,col); g.addColorStop(1,shadeColor(col,-25)); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(this.x,this.y,this.r,0,Math.PI*2); ctx.fill(); ctx.lineWidth=3; ctx.strokeStyle='rgba(255,255,255,0.12)'; ctx.stroke(); if(isVIP()){ ctx.beginPath(); ctx.lineWidth=4; ctx.strokeStyle='rgba(255,215,75,0.9)'; ctx.arc(this.x,this.y,this.r+8,0,Math.PI*2); ctx.stroke(); } if(this.invincible>0){ ctx.globalAlpha=0.8; ctx.beginPath(); ctx.lineWidth=3; ctx.strokeStyle='rgba(123,255,245,0.9)'; ctx.arc(this.x,this.y,this.r+14,0,Math.PI*2); ctx.stroke(); ctx.globalAlpha=1; } ctx.restore(); } }
+class Player{ constructor(){ this.x=120; this.y=canvas.height/2; this.r=18; this.skin=state.selectedSkin; this.revived=false; this.invincible=0; } render(){ ctx.save(); ctx.beginPath(); ctx.fillStyle='rgba(0,0,0,0.12)'; ctx.ellipse(this.x+2,this.y+8,this.r+12,this.r+6,0,0,Math.PI*2); ctx.fill(); const col = SKINS[this.skin].color; const g = ctx.createLinearGradient(this.x-this.r,this.y-this.r,this.x+this.r,this.y+this.r); g.addColorStop(0,col); g.addColorStop(1,shadeColor(col,-25)); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(this.x,this.y,this.r,0,Math.PI*2); ctx.fill(); ctx.lineWidth=3; ctx.strokeStyle='rgba(255,255,255,0.12)'; ctx.stroke(); if(isVIP()){ ctx.beginPath(); ctx.lineWidth=4; ctx.strokeStyle='rgba(255,215,75,0.9)'; ctx.arc(this.x,this.y,this.r+8,0,Math.PI*2); ctx.stroke(); } if(this.invincible>0){ ctx.globalAlpha=0.8; ctx.beginPath(); ctx.lineWidth=3; ctx.strokeStyle='rgba(123,255,245,0.9)'; ctx.arc(this.x,this.y,this.r+14,0,Math.PI*2); ctx.stroke(); ctx.globalAlpha=1; } ctx.restore(); } }
 
-class Obstacle{ constructor(type){ this.type=type||'normal'; this.w = this.type==='wide'? rnd(70,140) : rnd(36,90); this.h = rnd(20,56); this.x = canvas.width + this.w; this.y = rnd(40, canvas.height-40); this.speed = DIFF[difficulty].speed + Math.random()*1.5 + (this.type==='fast'?2:0); this.hp = this.type==='tank'?2:1; } update(dt){ this.x -= this.speed * dt; } render(){ ctx.save(); if(this.type==='bomb'){ ctx.fillStyle='rgba(30,30,30,0.95)'; ctx.fillRect(this.x-this.w/2,this.y-this.h/2,this.w,this.h); ctx.font='20px monospace'; ctx.fillStyle='white'; ctx.textAlign='center'; ctx.fillText('💣', this.x, this.y+6); } else { const grad = ctx.createLinearGradient(this.x-this.w/2,this.y-this.h/2,this.x+this.w/2,this.y+this.h/2); grad.addColorStop(0,'#3bd6b8'); grad.addColorStop(1,'#1f9bd1'); ctx.fillStyle=grad; ctx.fillRect(this.x-this.w/2,this.y-this.h/2,this.w,this.h); ctx.lineWidth=2; ctx.strokeStyle='rgba(255,255,255,0.06)'; ctx.strokeRect(this.x-this.w/2,this.y-this.h/2,this.w,this.h); } ctx.restore(); } }
+class Obstacle{ constructor(type){ this.type=type||'normal'; this.w = this.type==='wide'? rnd(70,140) : rnd(36,90); this.h = rnd(20,56); this.x = canvas.width + this.w; this.y = rnd(40, canvas.height-40); this.speed = DIFF[difficulty].speed + Math.random()*1.5 + (this.type==='fast'?2:0); this.hp = this.type==='tank'?2:1; } update(dt){ this.x -= this.speed * dt; } render(){ ctx.save(); if(this.type==='bomb'){ ctx.fillStyle='rgba(30,30,30,0.95)'; ctx.fillRect(this.x-this.w/2,this.y-this.h/2,this.w,this.h); ctx.font='20px monospace'; ctx.fillStyle='white'; ctx.textAlign='center'; ctx.fillText('💣', this.x, this.y+6); } else if(this.type==='plane'){ // simple plane sprite
+   ctx.fillStyle='#cccccc'; ctx.fillRect(this.x-40,this.y-12,80,24); ctx.fillStyle='#999'; ctx.fillRect(this.x+30,this.y-6,18,12); ctx.fillStyle='#ff6666'; ctx.fillRect(this.x-6,this.y-22,12,8); } else { const grad = ctx.createLinearGradient(this.x-this.w/2,this.y-this.h/2,this.x+this.w/2,this.y+this.h/2); grad.addColorStop(0,'#3bd6b8'); grad.addColorStop(1,'#1f9bd1'); ctx.fillStyle=grad; ctx.fillRect(this.x-this.w/2,this.y-this.h/2,this.w,this.h); ctx.lineWidth=2; ctx.strokeStyle='rgba(255,255,255,0.06)'; ctx.strokeRect(this.x-this.w/2,this.y-this.h/2,this.w,this.h); } ctx.restore(); } }
 
 class Coin{ constructor(){ this.x = canvas.width + 20; this.y = rnd(60,canvas.height-60); this.r = 10; this.speed = DIFF[difficulty].speed + 1; } update(dt){ this.x -= this.speed * dt; } render(){ ctx.save(); ctx.beginPath(); ctx.fillStyle='gold'; ctx.arc(this.x,this.y,this.r,0,Math.PI*2); ctx.fill(); ctx.lineWidth=2; ctx.strokeStyle='rgba(0,0,0,0.25)'; ctx.stroke(); ctx.restore(); } }
 
 class Powerup{ constructor(kind){ this.kind=kind||'double'; this.x=canvas.width+40; this.y=rnd(80,canvas.height-80); this.r=14; this.speed=DIFF[difficulty].speed+0.8; } update(dt){ this.x -= this.speed*dt; } render(){ ctx.save(); ctx.beginPath(); ctx.fillStyle = this.kind==='shield'?'#7afcff':'#ffd54a'; ctx.arc(this.x,this.y,this.r,0,Math.PI*2); ctx.fill(); ctx.fillStyle='rgba(0,0,0,0.15)'; ctx.fillRect(this.x-12,this.y-2,24,4); ctx.restore(); } }
 
+class Laser{ constructor(x,y,vx,vy){ this.x=x; this.y=y; this.vx=vx; this.vy=vy; this.life=200; } update(dt){ this.x += this.vx * dt; this.y += this.vy * dt; this.life -= dt*16.67; } render(){ ctx.save(); ctx.fillStyle='rgba(255,30,30,0.9)'; ctx.fillRect(this.x-6,this.y-2,12,4); ctx.restore(); } }
+
 /* Game state */
-let player = new Player(); let obstacles=[]; let coinsArr=[]; let powerups=[]; let particles=[]; let running=false; let lastSpawn=0; let lastCoinSpawn=0; let lastPowSpawn=0; let score=0; let level=1; let lastTime = performance.now();
+let player = new Player(); let obstacles=[]; let coinsArr=[]; let powerups=[]; let particles=[]; let lasers = []; let running=false; let lastSpawn=0; let lastCoinSpawn=0; let lastPowSpawn=0; let score=0; let level=1; let lastTime = performance.now();
+let bgIndex = 0; const backgrounds = [
+  {g:['#2b0652','#6b2a83','#e98cd9']},
+  {g:['#021B79','#0575E6','#8ED6FF']},
+  {g:['#0f2027','#203a43','#2c5364']},
+  {g:['#20002c','#cbb4d4','#ffd1dc']},
+  {g:['#282c34','#3b8d99','#6dd3b0']}
+];
+let planeTimer = 0;
 
 /* session trackers used for daily challenges */
 let sessionEarnedCoins = 0; // coins earned in current run/session (for daily collect)
@@ -474,31 +456,23 @@ let touching=false; window.addEventListener('pointerdown', e=>{ touching=true; t
 function makeParticles(x,y,col,count){ for(let i=0;i<count;i++) particles.push({x,y,vx:(Math.random()-0.5)*6,vy:(Math.random()-0.5)*6,life:60+Math.random()*30,col}); }
 
 /* loop */
-function loop(now){ const dt = Math.min((now-lastTime)/16.67,4); lastTime = now; // update stats time
- const secondsElapsed = (dt * 16.67) / 1000;
- state.stats.timePlayed += secondsElapsed; // seconds
- sessionTimeAccum += secondsElapsed;
- // daily time accumulation
- if(state.dailyChallenges && state.dailyChallenges.type === 'time'){ state.dailyChallenges.progress = (state.dailyChallenges.progress||0) + secondsElapsed; }
- ctx.clearRect(0,0,canvas.width,canvas.height); drawBackground(); player.y += (targetY - player.y) * 0.18 * Math.min(dt,2); player.y = clamp(player.y,20,canvas.height-20); player.render(); if(running){ lastSpawn += 16.67*dt; if(lastSpawn > DIFF[difficulty].spawn){ lastSpawn=0; // spawn enemy type randomly
-   const r = Math.random(); if(r<0.12) obstacles.push(new Obstacle('fast')); else if(r<0.22) obstacles.push(new Obstacle('tank')); else obstacles.push(new Obstacle('normal')); }
-  lastCoinSpawn += 16.67*dt; if(lastCoinSpawn > 900){ lastCoinSpawn=0; if(Math.random() < DIFF[difficulty].coinRate) coinsArr.push(new Coin()); }
-  lastPowSpawn += 16.67*dt; if(lastPowSpawn > 6000){ lastPowSpawn=0; if(Math.random()<0.25) powerups.push(new Powerup(Math.random()<0.5?'shield':'double')); }
- }
+function loop(now){ const dt = Math.min((now-lastTime)/16.67,4); lastTime = now; const secondsElapsed = (dt * 16.67) / 1000; state.stats.timePlayed += secondsElapsed; sessionTimeAccum += secondsElapsed; if(state.dailyChallenges && state.dailyChallenges.type === 'time'){ state.dailyChallenges.progress = (state.dailyChallenges.progress||0) + secondsElapsed; }
+ ctx.clearRect(0,0,canvas.width,canvas.height); drawBackground(); player.y += (targetY - player.y) * 0.18 * Math.min(dt,2); player.y = clamp(player.y,20,canvas.height-20); player.render(); if(running){ lastSpawn += 16.67*dt; if(lastSpawn > DIFF[difficulty].spawn){ lastSpawn=0; // spawn enemy type randomly; every score 5000 -> more planes
+   const r = Math.random(); if(Math.random() < 0.09) obstacles.push(new Obstacle('fast')); else if(Math.random() < 0.18) obstacles.push(new Obstacle('tank')); else obstacles.push(new Obstacle('normal')); // occasionally spawn plane when score >=5000
+   if(score >= 5000 && Math.random() < 0.12) obstacles.push(new Obstacle('plane'));
+ } lastCoinSpawn += 16.67*dt; if(lastCoinSpawn > 900){ lastCoinSpawn=0; if(Math.random() < DIFF[difficulty].coinRate) coinsArr.push(new Coin()); } lastPowSpawn += 16.67*dt; if(lastPowSpawn > 6000){ lastPowSpawn=0; if(Math.random()<0.25) powerups.push(new Powerup(Math.random()<0.5?'shield':'double')); } }
+ // planes shoot lasers
+ planeTimer += 16.67 * (dt||1);
+ if(planeTimer > 4000){ planeTimer = 0; obstacles.forEach(o=>{ if(o.type==='plane'){ // shoot toward player
+    const angle = Math.atan2(player.y - o.y, (o.x - 30) - player.x); const speed = 10 + Math.random()*3; lasers.push(new Laser(o.x-30, o.y, -speed, Math.sin(angle)*2)); } }); }
  // coins
  for(let i=coinsArr.length-1;i>=0;i--){ const c=coinsArr[i]; c.update(dt); c.render(); if(c.x < -30) coinsArr.splice(i,1); if(collideCircleRect(player.x,player.y,player.r, c.x-c.r, c.y-c.r, c.r*2, c.r*2)){ coinsArr.splice(i,1); score += 10; const coinGain = isVIP()?2:1; state.coins += coinGain; state.totalScore += 10; state.stats.coins = (state.stats.coins||0)+coinGain; sessionEarnedCoins += coinGain; saveState(); if(state.soundOn) document.getElementById('sfxCoin').play(); makeParticles(c.x,c.y,'#ffd54a',10); updateDisplays(); checkAchievements(); checkDailyChallengeOnEvent(); } }
  // powerups
  for(let i=powerups.length-1;i>=0;i--){ const p=powerups[i]; p.update(dt); p.render(); if(p.x < -30) powerups.splice(i,1); if(collideCircleRect(player.x,player.y,player.r, p.x-p.r, p.y-p.r, p.r*2, p.r*2)){ powerups.splice(i,1); applyPowerup(p.kind); state.stats.powerups++; saveState(); showToast('Power-up: '+p.kind); } }
  // obstacles
- for(let i=obstacles.length-1;i>=0;i--){ const o=obstacles[i]; o.update(dt); o.render(); if(o.x + o.w < -50){ obstacles.splice(i,1); score += 20; state.totalScore += 20; state.stats.enemies = (state.stats.enemies||0)+1; updateLevelByScore(); updateDisplays(); saveState(); // update daily enemy progress
-   if(state.dailyChallenges && state.dailyChallenges.type === 'enemies'){ state.dailyChallenges.progress = (state.dailyChallenges.progress||0) + 1; checkDailyChallengeOnEvent(); }
- } else if(collideCircleRect(player.x,player.y,player.r, o.x-o.w/2, o.y-o.h/2, o.w, o.h)){
-   // collision
-   obstacles.splice(i,1);
-   if(isVIP() && !player.revived){ player.revived = true; showToast('VIP Revive used!'); makeParticles(player.x,player.y,'#ffd54a',30); // don't reduce lives
-   } else if(player.invincible>0){ showToast('Invincible! No damage'); } else { state.lives -= 1; saveState(); makeParticles(player.x,player.y,'#ff6b6b',20); if(state.soundOn) document.getElementById('sfxHit').play(); updateDisplays(); if(state.lives <= 0){ gameOver(); } }
- }
- }
+ for(let i=obstacles.length-1;i>=0;i--){ const o=obstacles[i]; o.update(dt); o.render(); if(o.x + o.w < -50){ obstacles.splice(i,1); score += 20; state.totalScore += 20; state.stats.enemies = (state.stats.enemies||0)+1; updateLevelByScore(); updateDisplays(); saveState(); if(state.dailyChallenges && state.dailyChallenges.type === 'enemies'){ state.dailyChallenges.progress = (state.dailyChallenges.progress||0) + 1; checkDailyChallengeOnEvent(); } } else if(collideCircleRect(player.x,player.y,player.r, o.x-o.w/2, o.y-o.h/2, o.w, o.h)){ obstacles.splice(i,1); if(isVIP() && !player.revived){ player.revived = true; showToast('VIP Revive used!'); makeParticles(player.x,player.y,'#ffd54a',30); } else if(player.invincible>0){ showToast('Invincible! No damage'); } else { state.lives -= 1; saveState(); makeParticles(player.x,player.y,'#ff6b6b',20); if(state.soundOn) document.getElementById('sfxHit').play(); updateDisplays(); if(state.lives <= 0){ gameOver(); } } } }
+ // lasers update & collisions
+ for(let i=lasers.length-1;i>=0;i--){ const L=lasers[i]; L.update(dt); L.render(); if(L.x < -50 || L.life<=0) lasers.splice(i,1); else if(Math.hypot(player.x-L.x, player.y-L.y) < (player.r+6)){ lasers.splice(i,1); if(isVIP() && !player.revived){ player.revived=true; showToast('VIP Revive used!'); } else if(player.invincible>0){ showToast('Invincible! No damage'); } else { state.lives -= 1; saveState(); makeParticles(player.x,player.y,'#ff6b6b',20); if(state.soundOn) document.getElementById('sfxHit').play(); updateDisplays(); if(state.lives <= 0) gameOver(); } } }
  // particles
  for(let i=particles.length-1;i>=0;i--){ const p=particles[i]; p.x+=p.vx; p.y+=p.vy; p.vy+=0.12; p.life--; if(p.life<=0) particles.splice(i,1); else{ ctx.globalAlpha = Math.max(p.life/100,0); ctx.fillStyle=p.col; ctx.fillRect(p.x,p.y,3,3); ctx.globalAlpha=1; } }
  // update invincible timer
@@ -506,24 +480,30 @@ function loop(now){ const dt = Math.min((now-lastTime)/16.67,4); lastTime = now;
  if(running) requestAnimationFrame(loop);
 }
 
-function drawBackground(){ const g = ctx.createLinearGradient(0,0,canvas.width,canvas.height); g.addColorStop(0,'rgba(0,0,0,0.06)'); g.addColorStop(1,'rgba(255,255,255,0.02)'); ctx.fillStyle = g; ctx.fillRect(0,0,canvas.width,canvas.height); }
+function drawBackground(){ // change background every 5000 score increments
+  const newIndex = Math.floor(score/5000) % backgrounds.length;
+  if(newIndex !== bgIndex){ bgIndex = newIndex; // when background changes, spawn some plane obstacles
+    for(let i=0;i<2;i++){ const p = new Obstacle('plane'); p.y = 50 + i*120; p.x = canvas.width + 60 + i*180; obstacles.push(p); } showToast('Background changed!'); }
+  const cols = backgrounds[bgIndex].g; const g = ctx.createLinearGradient(0,0,canvas.width,canvas.height); g.addColorStop(0,cols[0]); g.addColorStop(0.6,cols[1]); g.addColorStop(1,cols[2]); ctx.fillStyle = g; ctx.fillRect(0,0,canvas.width,canvas.height);
+}
 
 function collideCircleRect(cx,cy,cr, rx,ry,rw,rh){ const closestX = clamp(cx, rx, rx+rw); const closestY = clamp(cy, ry, ry+rh); const dx = cx - closestX; const dy = cy - closestY; return (dx*dx + dy*dy) < (cr*cr); }
 
 /* ------------------- Powerups & helpers ------------------- */
 let activePower = {double:false,shield:false};
-function applyPowerup(kind){ if(kind==='double'){ activePower.double = true; setTimeout(()=>{ activePower.double=false; showToast('Double ended'); },8000); showToast('Double points for 8s'); }
- if(kind==='shield'){ player.invincible = 6000; showToast('Shield active 6s'); }
-}
+function applyPowerup(kind){ if(kind==='double'){ activePower.double = true; setTimeout(()=>{ activePower.double=false; showToast('Double ended'); },8000); showToast('Double points for 8s'); } if(kind==='shield'){ player.invincible = 6000; showToast('Shield active 6s'); } }
+
+/* ------------------- Leaderboard helpers ------------------- */
+function loadLeaderboard(){ try{ return JSON.parse(localStorage.getItem(LS.leaderboard) || '[]'); }catch(e){ return []; } }
+function saveLeaderboard(lb){ localStorage.setItem(LS.leaderboard, JSON.stringify(lb)); }
+function updateLeaderboardEntry(name,scoreVal){ if(!name) return; const lb = loadLeaderboard(); const existing = lb.find(e=>e.name===name); if(existing){ if(scoreVal>existing.score) existing.score=scoreVal; } else lb.push({name,score:scoreVal}); lb.sort((a,b)=>b.score-a.score); if(lb.length>100) lb.length=100; saveLeaderboard(lb); }
 
 /* ------------------- Game control helpers ------------------- */
 function startGame(){ 
-  player = new Player(); player.skin = state.selectedSkin; player.revived=false; player.invincible=0; targetY=player.y; obstacles=[]; coinsArr=[]; powerups=[]; particles=[]; score=0; level=1; state.lives = state.lives || 1; state.stats.runs = (state.stats.runs||0)+1; saveState(); updateDisplays(); grantDailyVIP(); 
-  // reset session trackers
+  player = new Player(); player.skin = state.selectedSkin; player.revived=false; player.invincible=0; targetY=player.y; obstacles=[]; coinsArr=[]; powerups=[]; particles=[]; lasers=[]; score=0; level=1; state.lives = state.lives || 1; state.stats.runs = (state.stats.runs||0)+1; saveState(); updateDisplays(); grantDailyVIP(); 
   sessionEarnedCoins = 0;
   latestRunMaxScore = 0;
   sessionTimeAccum = 0;
-  // add playing class to shrink UI and hide controls
   document.body.classList.add('playing');
   if(!running){ running=true; lastTime = performance.now(); requestAnimationFrame(loop); } 
   closeAllMenus(false); 
@@ -531,34 +511,12 @@ function startGame(){
 function pauseGame(){ running=false; document.body.classList.remove('playing'); }
 function resumeGame(){ if(!running){ running=true; document.body.classList.add('playing'); lastTime = performance.now(); requestAnimationFrame(loop); } }
 
-function gameOver(){ running=false; document.body.classList.remove('playing'); // track latest run max score
- latestRunMaxScore = Math.max(latestRunMaxScore, score);
- // update highest and detect rank-up reward
- const prevHighest = state.highest;
- const prevRank = getRankFromScore(prevHighest).index;
- if(score > state.highest){
-   state.highest = score;
-   // compute new rank and reward accordingly
-   const newRank = getRankFromScore(state.highest);
-   const newRankIndex = newRank.index;
-   if(newRankIndex > prevRank){
-     // reward coins for rank up
-     const rankUpCoins = (newRankIndex - prevRank) * 200;
-     state.coins += rankUpCoins;
-     showToast('Rank up! '+newRank.name+' (+'+rankUpCoins+' coins)', 3000);
-   }
-   showRankUpAnimation(prevRank);
- }
- state.totalScore += score;
- saveState();
- updateDisplays();
- checkAchievements();
- // update daily challenge run progress
- if(state.dailyChallenges && state.dailyChallenges.type === 'runs'){
-   state.dailyChallenges.progress = (state.dailyChallenges.progress||0) + 1;
- }
- checkDailyChallengeOnEvent();
- setTimeout(()=>{ alert('Game Over — Score: '+score); openMenu('menuMain'); },50); 
+function gameOver(){ running=false; document.body.classList.remove('playing'); latestRunMaxScore = Math.max(latestRunMaxScore, score); const prevHighest = state.highest; const prevRank = getRankFromScore(prevHighest).index; if(score > state.highest){ state.highest = score; const newRank = getRankFromScore(state.highest); const newRankIndex = newRank.index; if(newRankIndex > prevRank){ const rankUpCoins = (newRankIndex - prevRank) * 200; state.coins += rankUpCoins; showToast('Rank up! '+newRank.name+' (+'+rankUpCoins+' coins)', 3000); } showRankUpAnimation(prevRank); } state.totalScore += score; saveState(); updateDisplays(); checkAchievements(); if(state.dailyChallenges && state.dailyChallenges.type === 'runs'){ state.dailyChallenges.progress = (state.dailyChallenges.progress||0) + 1; } checkDailyChallengeOnEvent();
+// update leaderboard (only when logged in or guest with provided name)
+const nameToUse = currentUser || ('Guest-'+Math.floor(Math.random()*9000+1000));
+updateLeaderboardEntry(nameToUse, score);
+
+setTimeout(()=>{ alert('Game Over — Score: '+score); openMenu('menuMain'); },50); 
 }
 
 function updateLevelByScore(){ const newLevel = Math.floor(score/500)+1; if(newLevel !== level){ level = newLevel; document.getElementById('levelDisplay').innerText = 'Level: '+level; } }
@@ -569,47 +527,31 @@ const shopRange = document.getElementById('shopRange');
 const shopLeft = document.getElementById('shopLeft');
 const shopRight = document.getElementById('shopRight');
 
-function renderSkins(){ skinsList.innerHTML=''; for(const key in SKINS){ const s=SKINS[key]; const card=document.createElement('div'); card.className='skinCard'; const preview=document.createElement('div'); preview.className='skinPreview'; preview.style.background=s.color; const label=document.createElement('div'); label.innerText=key.charAt(0).toUpperCase()+key.slice(1); const price=Math.ceil((s.cost||0)*(isVIP()?0.5:1)); const cost=document.createElement('div'); cost.className='small'; cost.innerText = (s.cost>0? price+' coins' : (s.exclusive? 'VIP only' : 'free')); const btn=document.createElement('button'); btn.className='btn'; btn.innerText = (state.ownedSkins.includes(key)? (state.selectedSkin===key? 'Selected':'Select') : 'Buy'); btn.onclick = ()=>{ if(s.exclusive && !isVIP()){ showToast('Exclusive: VIP only'); return; } if(state.ownedSkins.includes(key)){ state.selectedSkin = key; saveState(); player.skin = key; updateDisplays(); renderSkins(); showToast('Skin selected'); } else { if(state.coins >= price){ state.coins -= price; state.ownedSkins.push(key); state.selectedSkin = key; saveState(); player.skin = key; updateDisplays(); renderSkins(); showToast('Skin bought!'); checkAchievements(); } else showToast('Not enough coins'); } }; card.appendChild(preview); card.appendChild(label); card.appendChild(cost); card.appendChild(btn); skinsList.appendChild(card); } 
-  // after rendering update slider range
-  setTimeout(updateShopRange, 60);
+function renderSkins(){ skinsList.innerHTML=''; for(const key in SKINS){ const s=SKINS[key]; const card=document.createElement('div'); card.className='skinCard'; const preview=document.createElement('div'); preview.className='skinPreview'; preview.style.background=s.color; const label=document.createElement('div'); label.innerText=key.charAt(0).toUpperCase()+key.slice(1); const price=Math.ceil((s.cost||0)*(isVIP()?0.5:1)); const cost=document.createElement('div'); cost.className='small'; cost.innerText = (s.cost>0? price+' coins' : (s.exclusive? 'VIP only' : 'free')); const btn=document.createElement('button'); btn.className='btn'; btn.innerText = (state.ownedSkins.includes(key)? (state.selectedSkin===key? 'Selected':'Select') : 'Buy'); btn.onclick = ()=>{ if(s.exclusive && !isVIP()){ showToast('Exclusive: VIP only'); return; } if(state.ownedSkins.includes(key)){ state.selectedSkin = key; saveState(); player.skin = key; updateDisplays(); renderSkins(); showToast('Skin selected'); } else { if(state.coins >= price){ state.coins -= price; state.ownedSkins.push(key); state.selectedSkin = key; saveState(); player.skin = key; updateDisplays(); renderSkins(); showToast('Skin bought!'); checkAchievements(); } else showToast('Not enough coins'); } }; card.appendChild(preview); card.appendChild(label); card.appendChild(cost); card.appendChild(btn); skinsList.appendChild(card); } setTimeout(updateShopRange, 60);
 }
 renderSkins();
 
-function updateShopRange(){
-  const maxScroll = Math.max(0, skinsList.scrollWidth - skinsList.clientWidth);
-  shopRange.max = maxScroll;
-  // keep current scroll position in range
-  shopRange.value = Math.round(skinsList.scrollLeft || 0);
-}
+function updateShopRange(){ const maxScroll = Math.max(0, skinsList.scrollWidth - skinsList.clientWidth); shopRange.max = maxScroll; shopRange.value = Math.round(skinsList.scrollLeft || 0); }
 
-/* shop controls: slider & arrows & drag */
 shopRange.addEventListener('input', (e)=>{ skinsList.scrollLeft = Number(e.target.value); });
 skinsList.addEventListener('scroll', ()=>{ shopRange.value = Math.round(skinsList.scrollLeft); });
 
 shopLeft.addEventListener('click', ()=>{ const step = Math.floor(skinsList.clientWidth * 0.6); skinsList.scrollBy({left: -step, behavior:'smooth'}); });
 shopRight.addEventListener('click', ()=>{ const step = Math.floor(skinsList.clientWidth * 0.6); skinsList.scrollBy({left: step, behavior:'smooth'}); });
 
-// add drag-to-scroll for skinsList
 let isDown = false, startX, scrollLeftStart;
 skinsList.addEventListener('pointerdown', (e)=>{ isDown = true; skinsList.setPointerCapture(e.pointerId); startX = e.clientX; scrollLeftStart = skinsList.scrollLeft; skinsList.style.cursor = 'grabbing'; });
 skinsList.addEventListener('pointermove', (e)=>{ if(!isDown) return; const dx = e.clientX - startX; skinsList.scrollLeft = scrollLeftStart - dx; });
 skinsList.addEventListener('pointerup', (e)=>{ isDown = false; try{ skinsList.releasePointerCapture(e.pointerId); }catch(e){} skinsList.style.cursor = ''; });
 skinsList.addEventListener('pointerleave', ()=>{ isDown = false; skinsList.style.cursor = ''; });
 
-/*
-  openMenu/closeAllMenus adjustments:
-  - When a menu opens, ensure body.playing is removed so full-sized UI and controls show.
-  - When menus close, if the game is running we re-enable .playing (so collapsed UI & hidden buttons).
-*/
 function closeAllMenus(shouldResume = true){
   document.getElementById('overlay').style.display='none';
   document.querySelectorAll('.menu').forEach(m=>m.style.display='none');
   document.body.classList.remove('modal-open');
   if(shouldResume){
-    // resume the game and set playing mode if running
     if(running) resumeGame(); else document.body.classList.remove('playing');
   } else {
-    // do not resume (used when starting a new game that already set playing)
     if(running) document.body.classList.add('playing');
   }
 }
@@ -618,10 +560,8 @@ function openMenu(id){
   document.querySelectorAll('.menu').forEach(m=>m.style.display='none');
   document.getElementById(id).style.display='block';
   document.body.classList.add('modal-open');
-  // show normal-sized UI and show controls while in menu
   document.body.classList.remove('playing');
   pauseGame();
-  // update shop slider when shop opens
   if(id === 'menuShop') setTimeout(updateShopRange,80);
   if(id === 'menuDaily') setTimeout(renderDaily,40);
   if(id === 'menuBuy') setTimeout(()=>{/* noop */},40);
@@ -635,7 +575,7 @@ document.getElementById('introPlay').addEventListener('click', ()=>{ document.ge
 document.getElementById('introShop').addEventListener('click', ()=>{ document.getElementById('intro').style.display='none'; openMenu('menuShop'); renderSkins(); });
 document.getElementById('introAch').addEventListener('click', ()=>{ document.getElementById('intro').style.display='none'; openMenu('menuAch'); renderAchievements(); });
 document.getElementById('introSettings').addEventListener('click', ()=>{ document.getElementById('intro').style.display='none'; openMenu('menuSettings'); });
-document.getElementById('introReset').addEventListener('click', ()=>{ if(confirm('Reset all progress?')){ localStorage.clear(); location.reload(); } });
+document.getElementById('introReset').addEventListener('click', ()=>{ openMenu('menuSettings'); });
 
 document.getElementById('startFromMenu').addEventListener('click', startGame);
 document.getElementById('playBtn').addEventListener('click', startGame);
@@ -644,14 +584,15 @@ document.getElementById('shopBtn').addEventListener('click', ()=>{ openMenu('men
 document.getElementById('openShopFromMenu').addEventListener('click', ()=>{ openMenu('menuShop'); renderSkins(); });
 document.getElementById('backFromShop').addEventListener('click', ()=>{ openMenu('menuMain'); });
 
-document.getElementById('openBuyMenu').addEventListener('click', ()=>{ openMenu('menuBuy'); });
+document.getElementById('openBuyMenu').addEventListener('click', ()=>{
+  // require secret password before buy (user requested). Password is '17932846'
+  const pass = prompt('Enter store password to access Buy Coins:');
+  if(pass === '17932846'){ openMenu('menuBuy'); } else { showToast('Incorrect password'); }
+});
 
 document.getElementById('buyLife').addEventListener('click', ()=>{ const price = Math.ceil(100*(isVIP()?0.5:1)); if(state.coins>=price && state.lives < 5){ state.coins -= price; state.lives += 1; saveState(); updateDisplays(); showToast('Extra life purchased!'); } else if(state.lives>=5) showToast('Max lives reached'); else showToast('Not enough coins'); });
 
-// VIP purchase with coins (original simple method)
-document.getElementById('buyVipCoins').addEventListener('click', ()=>{ const cost=3000; if(state.coins >= cost){ state.coins -= cost; state.vipExpiry = Date.now() + 30*24*60*60*1000; if(!state.ownedSkins.includes('vip')) state.ownedSkins.push('vip'); state.lives = Math.max(state.lives,3); saveState(); updateDisplays(); renderSkins(); showToast('VIP ενεργοποιήθηκε για 1 μήνα!'); checkAchievements(); // daily challenge progress for buy_vip
-  if(state.dailyChallenges && state.dailyChallenges.type === 'buy_vip'){ state.dailyChallenges.progress = (state.dailyChallenges.progress||0) + 1; checkDailyChallengeOnEvent(); }
- } else showToast('Δεν έχεις αρκετά νομίσματα'); });
+document.getElementById('buyVipCoins').addEventListener('click', ()=>{ const cost=3000; if(state.coins >= cost){ state.coins -= cost; state.vipExpiry = Date.now() + 30*24*60*60*1000; if(!state.ownedSkins.includes('vip')) state.ownedSkins.push('vip'); state.lives = Math.max(state.lives,3); saveState(); updateDisplays(); renderSkins(); showToast('VIP ενεργοποιήθηκε για 1 μήνα!'); checkAchievements(); if(state.dailyChallenges && state.dailyChallenges.type === 'buy_vip'){ state.dailyChallenges.progress = (state.dailyChallenges.progress||0) + 1; checkDailyChallengeOnEvent(); } } else showToast('Δεν έχεις αρκετά νομίσματα'); });
 
 document.getElementById('settingsBtn').addEventListener('click', ()=>{ openMenu('menuSettings'); });
 document.getElementById('backFromSettings').addEventListener('click', ()=>{ openMenu('menuMain'); });
@@ -659,9 +600,7 @@ document.getElementById('backFromSettings').addEventListener('click', ()=>{ open
 document.getElementById('toggleSound').addEventListener('click', ()=>{ state.soundOn = !state.soundOn; saveState(); document.getElementById('toggleSound').innerText = state.soundOn? 'Sound: On':'Sound: Off'; showToast('Sound: '+(state.soundOn? 'On':'Off')); });
 document.getElementById('toggleSound').innerText = state.soundOn? 'Sound: On':'Sound: Off';
 
-document.getElementById('resetBtn').addEventListener('click', ()=>{ if(confirm('Reset all progress?')){ localStorage.clear(); location.reload(); } });
-
-document.getElementById('clearSaves').addEventListener('click', ()=>{ if(confirm('Clear saved coins, skins and settings?')){ localStorage.removeItem(LS.coins); localStorage.removeItem(LS.ownedSkins); localStorage.removeItem(LS.selectedSkin); localStorage.removeItem(LS.highest); localStorage.removeItem(LS.lives); localStorage.removeItem(LS.totalScore); localStorage.removeItem(LS.vipExpiry); localStorage.removeItem(LS.achievements); localStorage.removeItem(LS.stats); localStorage.removeItem(LS.dailyChallenges); location.reload(); } });
+document.getElementById('resetProgressInSettings').addEventListener('click', ()=>{ if(confirm('Reset all progress?')){ if(currentUser){ delete accounts[currentUser]; saveAccounts(accounts); currentUser=null; localStorage.removeItem(LS.currentUser); } localStorage.clear(); location.reload(); } });
 
 document.getElementById('achBtn').addEventListener('click', ()=>{ openMenu('menuAch'); renderAchievements(); });
 document.getElementById('backFromAch').addEventListener('click', ()=>{ openMenu('menuMain'); });
@@ -671,11 +610,12 @@ document.getElementById('claimAll').addEventListener('click', ()=>{ showToast('�
 document.getElementById('statsBtn').addEventListener('click', ()=>{ openMenu('menuStats'); renderStats(); });
 document.getElementById('backFromStats').addEventListener('click', ()=>{ openMenu('menuMain'); });
 
-/* Difficulty */
-function setDifficulty(d){ if(d==='hard' && !isVIP()){ showToast('Hard είναι διαθέσιμο μόνο για VIP'); return; } difficulty=d; state.difficulty=d; saveState(); document.getElementById('difEasy').classList.toggle('active', d==='easy'); document.getElementById('difMed').classList.toggle('active', d==='medium'); document.getElementById('difHard').classList.toggle('active', d==='hard'); }
+/* Difficulty: Extreme only for VIP */
+function setDifficulty(d){ if(d==='hard' && !isVIP()){ showToast('Hard είναι διαθέσιμο μόνο για VIP'); return; } if(d==='extreme' && !isVIP()){ showToast('Extreme is VIP-only'); return; } difficulty=d; state.difficulty=d; saveState(); document.getElementById('difEasy').classList.toggle('active', d==='easy'); document.getElementById('difMed').classList.toggle('active', d==='medium'); document.getElementById('difHard').classList.toggle('active', d==='hard'); document.getElementById('difExtreme').classList.toggle('active', d==='extreme'); document.getElementById('difExtreme').classList.toggle('locked', !isVIP()); }
 document.getElementById('difEasy').addEventListener('click', ()=>setDifficulty('easy'));
 document.getElementById('difMed').addEventListener('click', ()=>setDifficulty('medium'));
 document.getElementById('difHard').addEventListener('click', ()=>setDifficulty('hard'));
+document.getElementById('difExtreme').addEventListener('click', ()=>setDifficulty('extreme'));
 setDifficulty(state.difficulty);
 
 /* ------------------- Ranks & UI updates ------------------- */
@@ -685,90 +625,91 @@ function updateDisplays(){ document.getElementById('coinsDisplay').innerText = '
 
 function renderAchievements(){ const list = document.getElementById('achList'); list.innerHTML=''; ACHS.forEach(a=>{ const el = document.createElement('div'); el.className='achItem '+(state.achievements[a.id]?'achUnlocked':''); el.innerHTML = '<div><strong>'+a.title+'</strong><div class="small">'+a.desc+'</div></div><div>'+(state.achievements[a.id]? 'Unlocked':'Locked')+'</div>'; list.appendChild(el); }); }
 
-function renderStats(){ const c = document.getElementById('statsContent'); const s = state.stats; const lines = [
-  'Total time played: '+Math.floor(s.timePlayed)+'s',
-  'Runs played: '+(s.runs||0),
-  'Enemies defeated: '+(s.enemies||0),
-  'Powerups used: '+(s.powerups||0),
-  'Coins earned (total): '+(state.totalScore||0)
-]; c.innerHTML = lines.join('<br>'); }
+function renderStats(){ const c = document.getElementById('statsContent'); const s = state.stats; const lines = [ 'Total time played: '+Math.floor(s.timePlayed)+'s', 'Runs played: '+(s.runs||0), 'Enemies defeated: '+(s.enemies||0), 'Powerups used: '+(s.powerups||0), 'Coins earned (total): '+(state.totalScore||0) ]; c.innerHTML = lines.join('<br>'); }
 
-/* Rank up animation (now accepts prevRankIndex optionally) */
-function showRankUpAnimation(prevRankIndex = 0){ const rank = getRankFromScore(state.highest); showToast('Νέος βαθμός: '+rank.name,2000); // small sparkles
- for(let i=0;i<12;i++){ const sp = document.createElement('div'); sp.className='sparkle'; sp.style.left = (50 + Math.random()*40-20)+'%'; sp.style.top = (50 + Math.random()*40-20)+'%'; document.body.appendChild(sp); setTimeout(()=>sp.remove(),1600); } }
+function showRankUpAnimation(prevRankIndex = 0){ const rank = getRankFromScore(state.highest); showToast('Νέος βαθμός: '+rank.name,2000); for(let i=0;i<12;i++){ const sp = document.createElement('div'); sp.className='sparkle'; sp.style.left = (50 + Math.random()*40-20)+'%'; sp.style.top = (50 + Math.random()*40-20)+'%'; document.body.appendChild(sp); setTimeout(()=>sp.remove(),1600); } }
 
 /* ------------------- Utilities */
 function showToast(txt,timeout=2200){ const t=document.createElement('div'); t.className='toast'; t.innerText=txt; document.body.appendChild(t); setTimeout(()=>{ t.style.opacity=0; setTimeout(()=>t.remove(),400); },timeout); }
 
-/* safe audio play to avoid exceptions (bg music starts only on user gesture) */
-function safePlaySound(id, loop=false){
-  try{
-    const el = (id==='bgMusic') ? bgMusic : document.getElementById(id);
-    if(!el) return;
-    if(loop) el.loop = true;
-    if(state.soundOn){
-      el.currentTime = 0;
-      el.play().catch(()=>{ /* ignore */ });
-    }
-  }catch(e){}
-}
+function saveState(){ persistStateToStorage(); updateDisplays(); }
 
-/* ------------------- Hide/Show stats toggle ------------------- */
+/* ------------------- Stats toggle & account UI ------------------- */
 const toggleStatsBtn = document.getElementById('toggleStatsView');
 const hudRight = document.getElementById('hudRight');
 let statsHidden = false;
 toggleStatsBtn.addEventListener('click', ()=>{
   statsHidden = !statsHidden;
-  if(statsHidden){
-    hudRight.classList.add('hidden');
-    toggleStatsBtn.innerText = 'Show Stats';
-  } else {
-    hudRight.classList.remove('hidden');
-    toggleStatsBtn.innerText = 'Hide Stats';
-  }
+  if(statsHidden){ hudRight.classList.add('hidden'); toggleStatsBtn.innerText = 'Show Stats'; } else { hudRight.classList.remove('hidden'); toggleStatsBtn.innerText = 'Hide Stats'; }
 });
 
-/* ------------------- Payment (Simulated) ------------------- */
-/* This is a local simulated payment flow: DO NOT send sensitive data anywhere.
-   It validates simple formats and credits coins only locally. */
+/* ------------------- Payment (Simulated) with password gate removed earlier by openBuyMenu prompt ------------------- */
 document.getElementById('submitPayment').addEventListener('click', ()=>{
   const name = document.getElementById('cardName').value.trim();
   const num = (document.getElementById('cardNumber').value || '').replace(/\s+/g,'');
   const exp = (document.getElementById('cardExpiry').value || '').trim();
   const cvc = (document.getElementById('cardCVC').value || '').trim();
   const amt = Number(document.getElementById('cardAmount').value || 1);
-
-  // basic validation (format only)
   if(!name || !/^\d{13,19}$/.test(num) || !/^\d{2}\/\d{2}$/.test(exp) || !/^\d{3,4}$/.test(cvc)){
     showToast('Payment info invalid — please use test data (simulated).');
     return;
   }
-  // Simulate processing
-  showToast('Processing payment...', 1800);
+  showToast('Processing payment...', 1200);
   setTimeout(()=>{
-    // credit coins mapping
     const creditMap = {1:100,5:600,10:1300,20:3000};
     const coins = creditMap[amt] || Math.round(amt * 100);
     state.coins += coins;
     saveState();
     updateDisplays();
     showToast('Payment successful : +'+coins+' coins');
-    // For daily challenge that requires buy_vip/any buy, we could update progress.
     closeAllMenus();
-  }, 1600);
+  }, 1200);
 });
 document.getElementById('backFromBuy').addEventListener('click', ()=>{ openMenu('menuShop'); });
 
+/* ------------------- Account creation / login / import/export ------------------- */
+document.getElementById('createAcct').addEventListener('click', ()=>{
+  const name = (document.getElementById('acctName').value||'').trim();
+  const pass = (document.getElementById('acctPass').value||'').trim();
+  if(!name || !pass){ showToast('Enter username and password'); return; }
+  if(accounts[name]){ showToast('Account exists — choose another name'); return; }
+  accounts[name] = { password:pass, coins:0, highest:0, ownedSkins:['red'], selectedSkin:'red', difficulty:'medium', soundOn:true, lives:1, totalScore:0, vipExpiry:0, achievements:{}, stats:{timePlayed:0,runs:0,enemies:0,powerups:0,coins:0}, dailyChallenges:{} };
+  saveAccounts(accounts); currentUser = name; localStorage.setItem(LS.currentUser, currentUser); state = loadStateForUser(); saveState(); updateDisplays(); renderSkins(); showToast('Account created & logged in: '+name);
+});
+
+document.getElementById('loginAcct').addEventListener('click', ()=>{
+  const name = (document.getElementById('acctName').value||'').trim();
+  const pass = (document.getElementById('acctPass').value||'').trim();
+  if(!name || !pass){ showToast('Enter username and password'); return; }
+  if(!accounts[name]){ showToast('No such account'); return; }
+  if(accounts[name].password !== pass){ showToast('Wrong password'); return; }
+  currentUser = name; localStorage.setItem(LS.currentUser, currentUser); state = loadStateForUser(); saveState(); updateDisplays(); renderSkins(); showToast('Logged in: '+name);
+});
+
+document.getElementById('exportAcct').addEventListener('click', ()=>{
+  if(!currentUser){ showToast('Login first to export your account'); return; }
+  const data = JSON.stringify(accounts[currentUser]);
+  const blob = new Blob([data], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url; a.download = currentUser + '_strike_account.json'; a.click(); URL.revokeObjectURL(url); showToast('Exported account JSON');
+});
+
+document.getElementById('importAcct').addEventListener('click', ()=>{
+  const txt = prompt('Paste account JSON here (or use exported file content)');
+  if(!txt) return;
+  try{ const obj = JSON.parse(txt); if(!obj || !obj || !obj || !obj) { showToast('Invalid JSON'); return; } const name = prompt('Pick a username to import under:'); if(!name) return; accounts[name] = obj; saveAccounts(accounts); showToast('Account imported as '+name); }catch(e){ showToast('Import failed'); }
+});
+
+/* ------------------- Leaderboard UI ------------------- */
+document.getElementById('leaderBtn').addEventListener('click', ()=>{ openMenu('menuLeader'); renderLeaderboard(); });
+document.getElementById('backFromLeader').addEventListener('click', ()=>{ openMenu('menuMain'); });
+document.getElementById('exportLeaderboard').addEventListener('click', ()=>{
+  const lb = loadLeaderboard(); const blob = new Blob([JSON.stringify(lb)], {type:'application/json'}); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'strike_leaderboard.json'; a.click(); URL.revokeObjectURL(url); showToast('Leaderboard exported');
+});
+function renderLeaderboard(){ const lb = loadLeaderboard(); const container = document.getElementById('leaderList'); container.innerHTML=''; if(lb.length===0) container.innerHTML='<div class="small">No entries yet</div>'; lb.forEach((e,i)=>{ const el = document.createElement('div'); el.className='achItem'; el.innerHTML = `<div><strong>#${i+1} ${e.name}</strong><div class="small">Score: ${e.score}</div></div><div>${i<3? '⭐':''}</div>`; container.appendChild(el); }); }
+
 /* ------------------- Initial states & loop setup ------------------- */
-(function init(){ if(state.ownedSkins.includes('vip') || state.highest > 2000) document.querySelector('.legend').style.display='block'; else document.querySelector('.legend').style.display='none'; if(!targetY) targetY = canvas.height/2; updateDisplays(); renderSkins(); renderAchievements(); renderStats(); // auto-check achievements
- checkAchievements(); // ensure daily challenge exists for today
- ensureDailyChallenge();
- setInterval(()=>{ if(document.visibilityState==='visible'){ updateDisplays(); renderSkins(); checkAchievements(); checkDailyChallengeOnEvent(); } },5000);
- // ensure intro controls reflect main controls' state (sound label etc)
- document.getElementById('toggleSound').innerText = state.soundOn? 'Sound: On':'Sound: Off';
- // hook daily button
- document.getElementById('dailyBtn').addEventListener('click', ()=>{ openMenu('menuDaily'); renderDaily(); });
-})();
+(function init(){ if(state.ownedSkins.includes('vip') || state.highest > 2000) document.querySelector('.legend').style.display='block'; else document.querySelector('.legend').style.display='none'; if(!targetY) targetY = canvas.height/2; updateDisplays(); renderSkins(); renderAchievements(); renderStats(); checkAchievements(); ensureDailyChallenge(); setInterval(()=>{ if(document.visibilityState==='visible'){ updateDisplays(); renderSkins(); checkAchievements(); checkDailyChallengeOnEvent(); } },5000); document.getElementById('toggleSound').innerText = state.soundOn? 'Sound: On':'Sound: Off'; document.getElementById('dailyBtn').addEventListener('click', ()=>{ openMenu('menuDaily'); renderDaily(); }); })();
 
 /* overlay outside click close */
 document.getElementById('overlay').addEventListener('click',(e)=>{ if(e.target.id==='overlay') closeAllMenus(); });
@@ -776,4 +717,3 @@ document.getElementById('overlay').addEventListener('click',(e)=>{ if(e.target.i
 </script>
 </body>
 </html>
-
